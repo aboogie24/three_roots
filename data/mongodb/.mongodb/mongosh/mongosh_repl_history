@@ -1,0 +1,64 @@
+db.occupants.find()
+show collections 
+how collections 
+db.getUsers()
+use mredb 
+us mredb 
+db.system.users.find()
+})
+  ]
+    { role: "clusterAdmin", db: "admin" }
+    { role: "dbAdminAnyDatabase", db: "admin" },
+    { role: "readWriteAnyDatabase", db: "admin" },
+    { role: "userAdminAnyDatabase", db: "admin" },
+  roles: [
+  pwd: "your_secure_password",
+  user: "admin",
+show collections 
+db.system.users.find()
+use admin 
+db.accounts.find().pretty()
+show collections 
+\
+db.occupants.find()
+db.occupants.find 
+show collections 
+use mredb
+show collections 
+use local 
+show collections 
+use config 
+show databases
+show collections 
+use admin
+db.accounts.find()
+show collections 
+db.listCollections
+db.listCollections()
+db.accounts()
+show collections 
+use mredb
+show databases 
+show collections 
+db.accounts.find()
+show collections 
+use mredb
+show collections 
+use local
+show dbs 
+db.local.find()
+show databases 
+show collections 
+db.occupants.find()
+db.accounts.find()
+use mredb 
+show collections 
+use local 
+show collections 
+use config 
+use confit 
+show collections 
+use admin 
+show collections 
+use mredb 
+show dbs  
