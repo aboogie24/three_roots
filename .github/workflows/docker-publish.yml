@@ -1,0 +1,163 @@
+name: Build and Push Three Roots to Docker Hub
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'three_roots/**'
+      - '.github/workflows/docker-publish.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'three_roots/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - production
+          - development
+        default: 'production'
+
+env:
+  IMAGE_NAME: three-roots-frontend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'production' || 'development') }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Determine environment and tags
+        id: env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.event.inputs.environment }}" == "production" ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+            echo "tags=${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest,${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:prod-${{ github.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=development" >> $GITHUB_OUTPUT
+            echo "tags=${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:dev,${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:dev-${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=dev,enable=${{github.ref == 'refs/heads/develop'}}
+            type=raw,value=prod,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./three_roots
+          file: ./three_roots/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            ENVIRONMENT=${{ steps.env.outputs.environment }}
+
+      - name: Image digest
+        run: echo ${{ steps.meta.outputs.digest }}
+
+      - name: Create deployment summary
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ steps.env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit SHA:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Docker Hub Repository:** ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Published Tags" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🐳 Pull Command" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ steps.env.outputs.environment }}" == "production" ]]; then
+            echo "docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:dev" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  deploy-dev-stack:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: development
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create .env file for development
+        run: |
+          cat > .env << EOF
+          # Development Environment Configuration
+          APP_DOMAIN=localhost
+          APP_PORT=8080
+          APP_PROTOCOL=http
+          
+          # MicroRealEstate Version
+          MRE_VERSION=latest
+          
+          # Security (Use strong secrets in production)
+          REDIS_PASSWORD=dev_redis_password
+          ACCESS_TOKEN_SECRET=dev_access_token_secret
+          REFRESH_TOKEN_SECRET=dev_refresh_token_secret
+          RESET_TOKEN_SECRET=dev_reset_token_secret
+          APPCREDZ_TOKEN_SECRET=dev_appcredz_token_secret
+          CIPHER_KEY=dev_cipher_key
+          CIPHER_IV_KEY=dev_cipher_iv_key
+          
+          # Database
+          MONGO_URL=mongodb://mongo/mredb
+          
+          # Three Roots Frontend
+          THREE_ROOTS_IMAGE=${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:dev
+          EOF
+
+      - name: Deployment notification
+        run: |
+          echo "## 🏗️ Development Stack Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Development environment configuration created." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To deploy the full stack locally:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "docker-compose up -d" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
