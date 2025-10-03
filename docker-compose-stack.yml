@@ -73,21 +73,21 @@ services:
   ###############################################################################
   # Reverse Proxy (Caddy)
   ###############################################################################
-  reverse-proxy:
-    image: caddy:latest
-    container_name: mre-caddy
-    restart: unless-stopped
-    command: caddy reverse-proxy --from ${APP_PROTOCOL:-http}://${APP_DOMAIN:-localhost}:${APP_PORT:-80} --to gateway:8080
-    ports:
-      - "${APP_PORT:-80}:${APP_PORT:-80}"
-      - "443:443"
-    networks:
-      - net
-    depends_on:
-      - gateway
-    labels:
-      - "com.three-roots.description=Reverse Proxy"
-      - "com.three-roots.service=proxy"
+  # reverse-proxy:
+  #   image: caddy:latest
+  #   container_name: mre-caddy
+  #   restart: unless-stopped
+  #   command: caddy reverse-proxy --from ${APP_PROTOCOL:-http}://${APP_DOMAIN:-localhost}:${APP_PORT:-80} --to gateway:8080
+  #   ports:
+  #     - "${APP_PORT:-80}:${APP_PORT:-80}"
+  #     - "443:443"
+  #   networks:
+  #     - net
+  #   depends_on:
+  #     - gateway
+  #   labels:
+  #     - "com.three-roots.description=Reverse Proxy"
+  #     - "com.three-roots.service=proxy"
 
   ###############################################################################
   # Gateway
