@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "9000:9000"      # Portainer Web UI (HTTP)
+      - "9443:9443"      # Portainer Web UI (HTTPS)
+      - "8000:8000"      # Portainer Edge Agent (optional)
+    volumes:
+      # Docker socket to manage containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Portainer data persistence
+      - portainer_data:/data
+    networks:
+      - portainer_net
+    environment:
+      # Portainer configuration
+      - TZ=${TZ:-America/New_York}
+    command: --http-enabled
+    labels:
+      - "com.portainer.description=Portainer Container Management Platform"
+
+  # Optional: Portainer Agent for remote management
+  # Uncomment if you need to manage remote Docker hosts
+  # portainer-agent:
+  #   image: portainer/agent:latest
+  #   container_name: portainer-agent
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9001:9001"
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - /var/lib/docker/volumes:/var/lib/docker/volumes
+  #   networks:
+  #     - portainer_net
+
+volumes:
+  portainer_data:
+    driver: local
+    name: portainer_data
+
+networks:
+  portainer_net:
+    driver: bridge
+    name: portainer_network
